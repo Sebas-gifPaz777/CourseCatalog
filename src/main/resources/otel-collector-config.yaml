@@ -1,0 +1,44 @@
+receivers: 
+  otlp: 
+    protocols: 
+      grpc: 
+        endpoint: 0.0.0.0:4317 
+      http: 
+        endpoint: 0.0.0.0:4318 
+ 
+processors: 
+  batch: 
+ 
+exporters: 
+  logging: 
+    verbosity: detailed 
+  otlp: 
+    endpoint: "jaeger:4317" 
+    tls: 
+      insecure: true 
+  prometheus: 
+    endpoint: "0.0.0.0:8889" 
+    namespace: "otel" 
+    const_labels: 
+      label1: value1 
+  file: 
+    path: /var/log/otel-collector.log  # Exportar logs a archivo 
+ 
+service: 
+  pipelines: 
+    traces: 
+      receivers: [otlp] 
+      processors: [batch] 
+      exporters: [otlp, logging] 
+    metrics: 
+      receivers: [otlp] 
+      processors: [batch] 
+      exporters: [prometheus, logging] 
+    logs: 
+      receivers: [otlp] 
+      processors: [batch] 
+      exporters: [file, logging]  # Exportar logs a archivo y Logging para depuración 
+ 
+  telemetry: 
+    logs: 
+      level: "debug" 
