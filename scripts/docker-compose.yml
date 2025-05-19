@@ -23,6 +23,19 @@ services:
       timeout: 5s
       retries: 10
 
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686" # Web UI
+      - "14250:14250" # gRPC for Jaeger-to-Jaeger communication
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - futurex-network
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.98.0
     container_name: otel-collector
@@ -31,33 +44,65 @@ services:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
       - ./logs:/var/log
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8889:8889"
+      - "4319:4317" # OTLP gRPC receiver
+      - "4320:4318" # OTLP HTTP receiver
+      - "8889:8889" # Prometheus exporter
     depends_on:
+      - jaeger
       - prometheus
     networks:
       - futurex-network
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+    networks:
+      - futurex-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.14.0
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - futurex-network
+
+  logstash:
+    user: root
+    image: docker.elastic.co/logstash/logstash:7.14.0
+    container_name: logstash
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ./logs:/var/log
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    depends_on:
+      - elasticsearch
+    networks:
+      - futurex-network
+
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:v2.30.3
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     networks:
       - futurex-network
 
   grafana:
-    image: grafana/grafana-oss
+    image: grafana/grafana:8.1.2
     container_name: grafana
     ports:
       - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
     networks:
