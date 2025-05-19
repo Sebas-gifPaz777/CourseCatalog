@@ -2,7 +2,12 @@
   otlp:
     protocols:
       grpc:
+        endpoint: 0.0.0.0:4317
       http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
 
 exporters:
   prometheus:
@@ -11,8 +16,20 @@ exporters:
   logging:
     loglevel: debug
 
+  file:
+    path: /var/log/otel-collector.log
+
 service:
   pipelines:
     metrics:
       receivers: [otlp]
+      processors: [batch]
       exporters: [prometheus, logging]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file, logging]
