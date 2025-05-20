@@ -27,10 +27,11 @@ services:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger
     ports:
-      - "16686:16686" # Web UI
-      - "14250:14250" # gRPC for Jaeger-to-Jaeger communication
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver
+      - "16686:16686"  # Web UI
+      - "14250:14250"  # gRPC for Jaeger-to-Jaeger communication
+      # Comentamos estos puertos para evitar conflictos con el colector OpenTelemetry
+      # - "4317:4317"  # OTLP gRPC receiver
+      # - "4318:4318"  # OTLP HTTP receiver
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     networks:
@@ -44,12 +45,9 @@ services:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
       - ./logs:/var/log
     ports:
-      - "4319:4317" # OTLP gRPC receiver
-      - "4320:4318" # OTLP HTTP receiver
-      - "8889:8889" # Prometheus exporter
-    depends_on:
-      - jaeger
-      - prometheus
+      - "4317:4317"  # OTLP gRPC receiver - Cambiado para evitar conflictos
+      - "4318:4318"  # OTLP HTTP receiver - Cambiado para evitar conflictos
+      - "8889:8889"  # Prometheus exporter
     networks:
       - futurex-network
 
@@ -58,6 +56,7 @@ services:
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
       - "9200:9200"
     networks:
@@ -89,20 +88,34 @@ services:
       - futurex-network
 
   prometheus:
-    image: prom/prometheus:v2.30.3
+    image: prom/prometheus:v2.45.0
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
     ports:
       - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
       - futurex-network
 
   grafana:
-    image: grafana/grafana:8.1.2
+    image: grafana/grafana:10.0.3
     container_name: grafana
     ports:
       - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
     depends_on:
       - prometheus
     networks:
@@ -110,6 +123,8 @@ services:
 
 volumes:
   mysql-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   futurex-network:

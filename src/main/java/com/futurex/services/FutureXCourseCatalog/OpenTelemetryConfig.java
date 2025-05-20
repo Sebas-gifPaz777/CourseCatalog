@@ -1,6 +1,5 @@
 package com.futurex.services.FutureXCourseCatalog;
 
-
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Tracer;
@@ -33,9 +32,15 @@ public class OpenTelemetryConfig {
 
     @Bean
     public OpenTelemetry openTelemetry() {
+        // Cambio importante: asegurarnos de incluir service.name específico para el taller
         Resource resource = Resource.getDefault()
-                .merge(Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME,
-                        applicationName)));
+                .merge(Resource.create(Attributes.builder()
+                        // Añadimos el service.name requerido para la consulta ELK
+                        .put(ResourceAttributes.SERVICE_NAME, "fx-catalog-service")
+                        // Añadimos algunos atributos adicionales útiles
+                        .put("application.name", applicationName)
+                        .put("deployment.environment", "workshop")
+                        .build()));
 
         OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
                 .setEndpoint(otlpEndpoint)
@@ -68,7 +73,6 @@ public class OpenTelemetryConfig {
                 .setTracerProvider(sdkTracerProvider)
                 .setMeterProvider(sdkMeterProvider)
                 .setLoggerProvider(sdkLoggerProvider)
-
                 .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
                 .buildAndRegisterGlobal();
 

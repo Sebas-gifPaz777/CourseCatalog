@@ -1,6 +1,5 @@
 package com.futurex.services.FutureXCourseCatalog;
 
-
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -68,7 +67,9 @@ public class CatalogController {
             throw e;
         } finally {
             span.end();
-            timer.stop(meterRegistry.timer("catalog.courses.request"));
+            // Cambiar el nombre de la métrica para que coincida con la consulta Prometheus del taller
+            timer.stop(meterRegistry.timer("catalog_courses_request_seconds",
+                    "endpoint", "/catalog"));
         }
     }
 
@@ -88,6 +89,63 @@ public class CatalogController {
         } finally {
             span.end();
             timer.stop(meterRegistry.timer("catalog.firstcourse.request"));
+        }
+    }
+
+    /**
+     * Endpoint para generar errores para la tarea de ELK
+     */
+    @RequestMapping("/error-test")
+    public String testError() {
+        logger.error("Este es un error de prueba en el servicio de catálogo");
+
+        // Span específico para el error
+        Span span = tracer.spanBuilder("testError").startSpan();
+        span.setAttribute("service.name", "fx-catalog-service");
+        span.setAttribute("log.level", "ERROR");
+
+        try {
+            // Generar algunos errores adicionales con diferentes mensajes
+            for (int i = 0; i < 3; i++) {
+                logger.error("Error #{} en fx-catalog-service: Simulación de error para el taller de monitoreo", i);
+            }
+
+            return "Errores generados para la tarea de ELK";
+        } finally {
+            span.end();
+        }
+    }
+
+    /**
+     * Endpoint para probar la visualización de métricas
+     */
+    @RequestMapping("/stress-test")
+    public String stressTest() {
+        logger.info("Inicio de prueba de estrés");
+        Timer.Sample timer = Timer.start(meterRegistry);
+        Span span = tracer.spanBuilder("stressTest").startSpan();
+
+        try {
+            // Generar carga de CPU
+            long result = 0;
+            for (int i = 0; i < 10_000_000; i++) {
+                result += i;
+            }
+
+            // Generar algunos errores ocasionales para el dashboard
+            if (Math.random() < 0.3) {
+                logger.error("Error aleatorio durante la prueba de estrés");
+                throw new RuntimeException("Error simulado durante la prueba de estrés");
+            }
+
+            logger.info("Prueba de estrés completada: {}", result);
+            return "Prueba de estrés completada con resultado: " + result;
+        } catch (Exception e) {
+            logger.error("Error en la prueba de estrés", e);
+            throw e;
+        } finally {
+            span.end();
+            timer.stop(meterRegistry.timer("catalog.stress.request"));
         }
     }
 }

@@ -6,3 +6,16 @@ scrape_configs:
     scrape_interval: 10s
     static_configs:
       - targets: ['otel-collector:8889']
+      
+  # ConfiguraciÃ³n para recopilar mÃ©tricas de Spring Boot
+  - job_name: 'spring-boot'
+    scrape_interval: 5s
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8001', 'host.docker.internal:8002']
+    
+  # ConfiguraciÃ³n para monitorear los contenedores Docker
+  - job_name: 'docker'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['host.docker.internal:9323']
